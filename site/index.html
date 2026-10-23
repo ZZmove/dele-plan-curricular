@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DELE Plan Curricular Viewer</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    .filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    select, input { padding: 0.4rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+    th, td { border: 1px solid #ddd; padding: 0.4rem; text-align: left; vertical-align: top; }
+    th { background: #f5f5f5; }
+    .anki-btn { margin-top: 1rem; padding: 0.5rem 1rem; }
+  </style>
+</head>
+<body>
+  <h1>DELE Plan Curricular</h1>
+  <p>Browse structured data from Instituto Cervantes Plan Curricular. Chinese translations to be added later.</p>
+
+  <div class="filters">
+    <select id="level">
+      <option value="">All levels</option>
+      <option>A1</option><option>A2</option><option>B1</option>
+      <option>B2</option><option>C1</option><option>C2</option>
+    </select>
+    <select id="component">
+      <option value="">All components</option>
+      <option>Gramática</option>
+      <option>Funciones</option>
+      <option>Nociones generales</option>
+      <option>Nociones específicas</option>
+    </select>
+    <input type="text" id="search" placeholder="Search descriptor / exponent...">
+  </div>
+
+  <table id="table">
+    <thead>
+      <tr>
+        <th>Level</th><th>Component</th><th>Chapter</th><th>Descriptor</th><th>Exponent</th><th>Notes</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <button class="anki-btn" id="exportAnki">Export filtered as Anki TSV</button>
+
+  <script>
+    // TODO: load CSVs from /output/*.csv or a combined JSON
+    // For now, placeholder
+    const data = []; // will be populated by fetch
+
+    async function loadData() {
+      // Example: fetch('/output/gramatica.csv') and parse
+      // Or use multiple files
+      console.log("Load CSV(s) here and render table");
+    }
+
+    function render(filtered) {
+      const tbody = document.querySelector("#table tbody");
+      tbody.innerHTML = filtered.map(row => `
+        <tr>
+          <td>${row.level}</td>
+          <td>${row.component}</td>
+          <td>${row.chapter}</td>
+          <td>${row.descriptor}</td>
+          <td>${row.exponent}</td>
+          <td>${row.notes}</td>
+        </tr>
+      `).join("");
+    }
+
+    function filter() {
+      const level = document.getElementById("level").value;
+      const component = document.getElementById("component").value;
+      const q = document.getElementById("search").value.toLowerCase();
+      const filtered = data.filter(r =>
+        (!level || r.level === level) &&
+        (!component || r.component === component) &&
+        (!q || (r.descriptor + r.exponent).toLowerCase().includes(q))
+      );
+      render(filtered);
+    }
+
+    document.getElementById("level").onchange = filter;
+    document.getElementById("component").onchange = filter;
+    document.getElementById("search").oninput = filter;
+
+    document.getElementById("exportAnki").onclick = () => {
+      // Generate TSV: Front (exponent) \t Back (descriptor + example + chinese)
+      alert("Anki export skeleton — implement TSV download");
+    };
+
+    loadData();
+  </script>
+</body>
+</html>
