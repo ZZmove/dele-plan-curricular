@@ -78,10 +78,11 @@
     async function loadData() {
       const status = document.getElementById("status");
       try {
+        const base = "https://raw.githubusercontent.com/ZZmove/dele-plan-curricular/main/output/";
         const files = ["a1.csv", "a2.csv", "b1.csv", "b2.csv", "c1.csv", "c2.csv"];
         const all = [];
         for (const f of files) {
-          const resp = await fetch(`../output/${f}`);
+          const resp = await fetch(base + f);
           if (!resp.ok) {
             console.warn("Failed to load", f);
             continue;
@@ -93,7 +94,7 @@
         status.textContent = `Loaded ${data.length} items.`;
         filter();
       } catch (e) {
-        status.textContent = "Failed to load CSVs. Ensure output/*.csv exist and paths are correct for GitHub Pages.";
+        status.textContent = "Failed to load CSVs. Upload a1.csv~c2.csv to the output/ folder.";
         console.error(e);
       }
     }
