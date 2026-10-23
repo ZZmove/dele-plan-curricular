@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DELE Plan Curricular Viewer</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 1200px; margin: 0 auto; padding: 1rem; }
+    .filters { display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+    select, input, button { padding: 0.4rem 0.6rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.9rem; margin-top: 1rem; }
+    th, td { border: 1px solid #ddd; padding: 0.5rem; text-align: left; vertical-align: top; }
+    th { background: #f5f5f5; position: sticky; top: 0; }
+    .status { color: #666; margin: 0.5rem 0; }
+  </style>
+</head>
+<body>
+  <h1>DELE Plan Curricular</h1>
+  <p>Browse structured data from Instituto Cervantes Plan Curricular (Gramática from pollow/spanish-pcic-json). Chinese translations to be added later.</p>
+
+  <div class="filters">
+    <select id="level">
+      <option value="">All levels</option>
+      <option>A1</option><option>A2</option><option>B1</option>
+      <option>B2</option><option>C1</option><option>C2</option>
+    </select>
+    <select id="component">
+      <option value="">All components</option>
+      <option>Gramática</option>
+      <option>Funciones</option>
+      <option>Nociones generales</option>
+      <option>Nociones específicas</option>
+    </select>
+    <input type="text" id="search" placeholder="Search descriptor / exponent...">
+    <button id="exportAnki">Export filtered as Anki TSV</button>
+  </div>
+
+  <div class="status" id="status">Loading data...</div>
+
+  <table id="table">
+    <thead>
+      <tr>
+        <th>Level</th><th>Component</th><th>Chapter</th><th>Section</th><th>Descriptor</th><th>Exponent</th><th>Notes</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    let data = [];
+
+    function parseCSV(text) {
+      const lines = text.trim().split(/\r?\n/);
+      if (lines.length < 2) return [];
+      const headers = lines[0].split(",").map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const values = [];
+        let current = "";
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i];
+          if (c === '"') {
+            inQuotes = !inQuotes;
+          } else if (c === "," && !inQuotes) {
+            values.push(current.trim());
+            current = "";
+          } else {
+            current += c;
+          }
+        }
+        values.push(current.trim());
+        const row = {};
+        headers.forEach((h, i) => row[h] = values[i] || "");
+        return row;
+      }).filter(r => r.id);
+    }
+
+    async function loadData() {
+      const status = document.getElementById("status");
+      try {
+        const base = "https://raw.githubusercontent.com/ZZmove/dele-plan-curricular/main/output/";
+        const files = ["a1.csv", "a2.csv", "b1.csv", "b2.csv", "c1.csv", "c2.csv"];
+        const all = [];
+        for (const f of files) {
+          const resp = await fetch(base + f);
+          if (!resp.ok) {
+            console.warn("Failed to load", f);
+            continue;
+          }
+          const text = await resp.text();
+          all.push(...parseCSV(text));
+        }
+        data = all;
+        status.textContent = `Loaded ${data.length} items.`;
+        filter();
+      } catch (e) {
+        status.textContent = "Failed to load CSVs. Upload a1.csv~c2.csv to the output/ folder.";
+        console.error(e);
+      }
+    }
+
+    function render(filtered) {
+      const tbody = document.querySelector("#table tbody");
+      tbody.innerHTML = filtered.slice(0, 300).map(row => `
+        <tr>
+          <td>${row.level || ""}</td>
+          <td>${row.component || ""}</td>
+          <td>${row.chapter || ""}</td>
+          <td>${row.section || ""}</td>
+          <td>${row.descriptor || ""}</td>
+          <td>${row.exponent || ""}</td>
+          <td>${row.notes || ""}</td>
+        </tr>
+      `).join("") + (filtered.length > 300 ? `<tr><td colspan="7">... and ${filtered.length - 300} more (showing first 300)</td></tr>` : "");
+    }
+
+    function filter() {
+      const level = document.getElementById("level").value;
+      const component = document.getElementById("component").value;
+      const q = document.getElementById("search").value.toLowerCase();
+      const filtered = data.filter(r =>
+        (!level || r.level === level) &&
+        (!component || r.component === component) &&
+        (!q || ((r.descriptor || "") + (r.exponent || "")).toLowerCase().includes(q))
+      );
+      render(filtered);
+      document.getElementById("status").textContent = `Showing ${filtered.length} / ${data.length} items.`;
+    }
+
+    document.getElementById("level").onchange = filter;
+    document.getElementById("component").onchange = filter;
+    document.getElementById("search").oninput = filter;
+
+    document.getElementById("exportAnki").onclick = () => {
+      const level = document.getElementById("level").value;
+      const component = document.getElementById("component").value;
+      const q = document.getElementById("search").value.toLowerCase();
+      const filtered = data.filter(r =>
+        (!level || r.level === level) &&
+        (!component || r.component === component) &&
+        (!q || ((r.descriptor || "") + (r.exponent || "")).toLowerCase().includes(q))
+      );
+      if (!filtered.length) {
+        alert("No items to export.");
+        return;
+      }
+      const lines = filtered.map(r => {
+        const front = (r.exponent || r.descriptor || "").replace(/\t/g, " ").replace(/\n/g, " ");
+        const back = [r.descriptor, r.notes, r.chinese].filter(Boolean).join(" | ").replace(/\t/g, " ").replace(/\n/g, " ");
+        return `${front}\t${back}`;
+      });
+      const blob = new Blob([lines.join("\n")], { type: "text/tab-separated-values" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `dele-pcic-anki-${new Date().toISOString().slice(0,10)}.tsv`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    loadData();
+  </script>
+</body>
+</html>
